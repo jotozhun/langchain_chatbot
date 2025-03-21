@@ -26,11 +26,12 @@ model = ChatGroq(model="llama-3.3-70b-versatile")
 # ChatPrompt Template
 prompt_template = ChatPromptTemplate(
     [
-        SystemMessage(content="You are a personal assistant that taks like a pirate."),
+        SystemMessage(content="You are a personal assistant that talks like a pirate."),
         MessagesPlaceholder(variable_name="messages")
     ]
 )
 
+# max_tons tipo 500 o 1000, en producción 2500
 # Messages Trimmer
 trimmer = trim_messages(
     strategy="last",
@@ -56,12 +57,12 @@ workflow.add_node("model", call_model)
 runnable_graph = workflow.compile(checkpointer=st.session_state.memory)
 
 # Graph config
-config = {"configurable": {"thread_id": 1}}
+config = {"configurable": {"thread_id": "caca"}}
 
 
 if prompt := st.chat_input():
 
-    # UI Messages
+    # Previous Messages
     for message in st.session_state.chat_history:
         with st.chat_message('human' if isinstance(message, HumanMessage) else "ai"):
             st.write(message.content)
@@ -69,11 +70,20 @@ if prompt := st.chat_input():
     # Appends user prompt to chat history        
     st.session_state.chat_history.append(HumanMessage(content=prompt))
 
+    # New Message
+    with st.chat_message("human"):
+        st.write(prompt)
     
-    completion = runnable_graph.invoke(S
-        {"messages": HumanMessage(content=prompt)}, config
-    )
+    # New AI Message
+    full_response = ""
+    with st.chat_message("assistant"):
+        placeholder = st.empty()
 
-    st.session_state.chat_history.append(AIMessage(content=completion["messages"][-1].content))
+    for chunk, metadata in runnable_graph.stream(
+        {"messages": HumanMessage(content=prompt)}, config, stream_mode="messages"):
+        full_response += chunk.content
+        placeholder.write(full_response)
 
-    completion["messages"][-1].pretty_print()
+    st.session_state.chat_history.append(AIMessage(content=full_response))
+
+    #print(full_response)
